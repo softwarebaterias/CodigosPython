@@ -1,0 +1,82 @@
+import serial                       #   LEITURA SERIAL
+import matplotlib.pyplot as plt     #   PLOTAR GRAFICO
+from drawnow import *               #   PLOTAR EM TEMPO REAL
+import atexit                       
+import time                         #   CONTADOR DE TEMPO 
+import random                       
+
+################ ARRANJOS DOS EIXOS X -TEMPO- ,Y -VALUES- ######################################### 
+values = []                   
+tempo = []
+
+
+plt.ion()
+cnt=0
+
+################ INICIALIZAÇÃO DA PORTA SERIAL #########################################
+ser = serial.Serial()
+ser.baudrate = 9600
+ser.port = 'COM3'
+ser.open()
+
+then = time.time()      # TEMPO ZERO 
+
+################ CRIANDO O GRÁFICO #########################################
+def plotValues():
+    plt.title('Serial value from ADC')
+    plt.grid(True)
+    plt.ylabel('Values')
+    plt.plot(tempo,values, 'rx-', label='values')
+    plt.legend(loc='upper right')
+
+################ VERIFICA SE A PORTA SERIAL ESTÁ FECHADA #########################################
+def doAtExit():
+    ser.close()
+    print("Close serial")
+    print("ser.isOpen() = " + str(ser.isOpen()))
+
+atexit.register(doAtExit)
+
+print("ser.isOpen() = " + str(ser.isOpen()))
+
+################ FAZ O GRÁFICO CAMINHAR JUNTO COM O PLOTTING #########################################
+# pre-load dummy data
+for i in range(0,1000):        # QUANTOS AXIS TERÃO NO SEU GRÁFICO
+    values.append(0)
+    tempo.append(0)
+
+################ MAIN - PLOTA EM TEMPO REAL #########################################
+while True:
+    while (ser.inWaiting()==0):
+        pass
+    print("readline()")
+    valueRead = ser.read(4)
+    valueRead = valueRead.decode("utf-8")   # TRANSFORMA EM STRING
+    valueRead = valueRead.rstrip('\x00')    # RETIRA OS ESPAÇOS EM BRANOC DA STRING
+    
+    #check if valid value can be casted
+    try:
+        valueInInt = int(valueRead)
+        print(valueInInt)
+
+        if valueInInt <= 8192:
+            if valueInInt >= 0:
+                values.append(valueInInt)
+                values.pop(0)
+                now = time.time()
+                x = now - then
+                x = round(x,3)
+
+                ################ SALVA EM UM TXT OS DADOS #########################################
+                with open('arquivoteste01.txt','a') as arquivo:
+                     arquivo.writelines(str(x) + ','+str(valueInInt)+'\n')
+
+                tempo.append(float(x))
+                tempo.pop(0)
+                drawnow(plotValues)
+            else:
+                print("Invalid! negative number")
+        else:
+            print("Invalid! too large")
+    except ValueError:
+        print("Invalid! cannot cast")
